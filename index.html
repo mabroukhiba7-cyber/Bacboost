@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz</title>
+  <style>
+    :root{--bg:#f7f9fc;--card:#ffffff;--accent:#0066cc;--accent-600:#005bb5;--text:#222;--muted:#6b7280;--success:#16a34a}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .container{max-width:720px;margin:2rem auto;padding:1rem}
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+    h1#subject-title{font-size:1.25rem;margin:0}
+    .controls button{margin-left:.5rem;padding:.45rem .8rem;border-radius:6px;border:1px solid rgba(0,0,0,.06);background:#fff;cursor:pointer}
+    .card{background:var(--card);border-radius:10px;padding:1.25rem;box-shadow:0 6px 18px rgba(15,23,42,.06)}
+    #question{font-weight:600;margin:0 0 1rem 0}
+    #options{display:grid;grid-template-columns:1fr;gap:.6rem}
+    #options button{background:linear-gradient(180deg,#fff,#f6f7fb);border:1px solid rgba(15,23,42,.06);padding:.8rem 1rem;border-radius:8px;text-align:left;cursor:pointer;font-size:1rem}
+    #options button:hover{border-color:var(--accent);box-shadow:0 4px 10px rgba(0,102,204,.06)}
+    #options button:disabled{opacity:.6;cursor:not-allowed}
+    .result{margin-top:1rem;padding:.75rem;border-radius:8px;background:#f0fdf4;color:var(--success);display:none}
+    .small{font-size:.9rem;color:var(--muted)}
+    @media(min-width:640px){#options{grid-template-columns:1fr 1fr}.controls button{margin-left:.75rem}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 id="subject-title">Quiz</h1>
+      <div class="controls">
+        <button id="mathBtn">Math</button>
+        <button id="physicsBtn">Physics</button>
+        <button id="englishBtn">English</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="question">Select a subject to start the quiz</h2>
+      <div id="options">
+        <button id="opt0">Option 1</button>
+        <button id="opt1">Option 2</button>
+        <button id="opt2">Option 3</button>
+        <button id="opt3">Option 4</button>
+      </div>
+      <div id="result" class="result"></div>
+      <div class="small" id="best-score"></div>
+    </div>
+  </div>
+
+  <script>
+    // Embedded question data (math, physics, english)
+    const mathQuestions = [
+      { question: "Calculer la dérivée de f(x) = x² − 3x + 1", options: ["2x − 3", "x − 3", "2x + 3", "x² − 3"], correct: 0 },
+      { question: "La solution de l’équation x² − 4 = 0 est :", options: ["x = 4", "x = −4", "x = ±2", "x = 2"], correct: 2 },
+      { question: "La limite de f(x) = 1/x lorsque x → +∞ est :", options: ["1", "0", "+∞", "−∞"], correct: 1 },
+      { question: "Le coefficient directeur de la droite y = 3x − 2 est :", options: ["−2", "3", "1/3", "2"], correct: 1 },
+      { question: "La primitive de f(x) = 2x est :", options: ["x² + C", "2x² + C", "x + C", "x² − C"], correct: 0 }
+    ];
+
+    const physicsQuestions = [
+      { question: "L’unité de la force dans le S.I. est :", options: ["Joule", "Watt", "Newton", "Pascal"], correct: 2 },
+      { question: "La relation fondamentale de la dynamique est :", options: ["P = mg", "F = m × a", "E = m × c²", "U = R × I"], correct: 1 },
+      { question: "L’énergie cinétique d’un corps de masse m et vitesse v est :", options: ["mgh", "½mv²", "mv", "mg"], correct: 1 },
+      { question: "Dans un circuit électrique, l’unité de la tension est :", options: ["Ampère", "Ohm", "Volt", "Watt"], correct: 2 },
+      { question: "La loi d’Ohm s’écrit :", options: ["U = R × I", "I = R × U", "R = U + I", "P = U × I"], correct: 0 }
+    ];
+
+    const englishQuestions = [
+      { question: "Choose the correct sentence:", options: ["She don't like coffee", "She doesn't likes coffee", "She doesn't like coffee", "She not like coffee"], correct: 2 },
+      { question: "Find the correct passive form: 'They built the bridge in 2010.'", options: ["The bridge is built in 2010", "The bridge was built in 2010", "The bridge has built in 2010", "The bridge was build in 2010"], correct: 1 },
+      { question: "Choose the correct word: 'I have lived here ___ 2018.'", options: ["for", "since", "during", "from"], correct: 1 },
+      { question: "Choose the correct conditional sentence:", options: ["If I will study, I pass", "If I study, I will pass", "If I studied, I will pass", "If I study, I would pass"], correct: 1 },
+      { question: "Choose the correct reported speech:", options: ["He said that he is tired", "He said that he was tired", "He said he tired", "He said that was tired"], correct: 1 }
+    ];
+
+    const allQuestions = { math: mathQuestions, physics: physicsQuestions, english: englishQuestions };
+
+    // Quiz logic (same as before)
+    let current = 0;
+    let score = 0;
+    let currentQuestions = null;
+    let currentSubject = "";
+
+    const title = document.getElementById('subject-title');
+    const questionEl = document.getElementById('question');
+    const optionsEls = [
+      document.getElementById('opt0'),
+      document.getElementById('opt1'),
+      document.getElementById('opt2'),
+      document.getElementById('opt3')
+    ];
+    const resultEl = document.getElementById('result');
+    const bestEl = document.getElementById('best-score');
+
+    function loadQuestion() {
+      const q = currentQuestions[current];
+      if (!q) return;
+      if (questionEl) questionEl.textContent = `Q${current+1}. ${q.question}`;
+      q.options.forEach((opt,i)=>{
+        if (optionsEls[i]) { optionsEls[i].textContent = opt; optionsEls[i].disabled = false; optionsEls[i].style.display = 'block'; }
+      });
+      if (resultEl) resultEl.style.display = 'none';
+      updateBest();
+    }
+
+    function checkAnswer(index){
+      const q = currentQuestions[current]; if (!q) return;
+      if (index === q.correct) score++;
+      current++;
+      if (current < currentQuestions.length) loadQuestion(); else showResult();
+    }
+
+    function showResult(){
+      if (questionEl) questionEl.textContent = `✅ Quiz finished! Your score: ${score} / ${currentQuestions.length}`;
+      optionsEls.forEach(btn=>{ if (btn) btn.style.display='none'; });
+      if (resultEl) { resultEl.textContent = 'Well done!'; resultEl.style.display = 'block'; }
+      const bestKey = currentSubject + '_best';
+      const best = Number(localStorage.getItem(bestKey) || 0);
+      if (score > best) localStorage.setItem(bestKey, String(score));
+      updateBest();
+    }
+
+    function updateBest(){
+      if (!bestEl || !currentSubject) return;
+      const bestKey = currentSubject + '_best';
+      const best = localStorage.getItem(bestKey);
+      bestEl.textContent = best ? `Best score: ${best} / ${currentQuestions.length}` : '';
+    }
+
+    function startQuiz(questionsArray, subjectName){
+      if (!Array.isArray(questionsArray) || questionsArray.length === 0) return;
+      currentQuestions = questionsArray; currentSubject = subjectName || ''; current=0; score=0;
+      if (title && currentSubject) title.textContent = currentSubject.toUpperCase() + ' - BAC Quiz';
+      optionsEls.forEach((btn,i)=>{ if (!btn) return; btn.disabled=false; btn.style.display='block'; btn.onclick = ()=>checkAnswer(i); });
+      loadQuestion();
+    }
+
+    // Wire up buttons
+    document.getElementById('mathBtn').addEventListener('click', ()=>startQuiz(mathQuestions,'math'));
+    document.getElementById('physicsBtn').addEventListener('click', ()=>startQuiz(physicsQuestions,'physics'));
+    document.getElementById('englishBtn').addEventListener('click', ()=>startQuiz(englishQuestions,'english'));
+
+    // Support starting via URL ?subject=math
+    const params = new URLSearchParams(window.location.search);
+    const subject = params.get('subject');
+    if (subject){ const s=subject.toLowerCase(); if (s==='math') startQuiz(mathQuestions,'math'); else if (s==='physics') startQuiz(physicsQuestions,'physics'); else if (s==='english') startQuiz(englishQuestions,'english'); }
+  </script>
+</body>
+</html>
